@@ -6,7 +6,9 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
-const API = import.meta.env.VITE_API_URL;
+import { API_BASE } from "../lib/api";
+
+
 type GroceryListRow = {
   id: string;
   name: string;
@@ -29,7 +31,7 @@ export function GroceryListsPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/grocery-lists`);
+      const res = await fetch(`${API_BASE}/grocery-lists`);
       const data = await res.json();
       setLists(data);
     } finally {

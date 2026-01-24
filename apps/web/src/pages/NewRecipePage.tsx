@@ -7,9 +7,9 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
+import { API_BASE } from "../lib/api";
 
 type IngredientRow = { name: string; amount: string; unit: string; optional: boolean };
-const API = import.meta.env.VITE_API_URL;
 
 
 export function NewRecipePage() {
@@ -65,7 +65,7 @@ export function NewRecipePage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API}/recipes`, {
+      const res = await fetch(`${API_BASE}/recipes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

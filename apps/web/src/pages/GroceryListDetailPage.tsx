@@ -7,6 +7,7 @@ import { Separator } from "../components/ui/separator";
 import { Checkbox } from "../components/ui/checkbox";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
+import { API_BASE } from "../lib/api";
 
 type Item = {
   id: string;
@@ -35,7 +36,7 @@ export function GroceryListDetailPage() {
   const [list, setList] = useState<List | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const API = import.meta.env.VITE_API_URL;
+
 
   async function load() {
     if (!id) return;
@@ -43,7 +44,7 @@ export function GroceryListDetailPage() {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`${API}/grocery-lists/${id}`);
+      const res = await fetch(`${API_BASE}/grocery-lists/${id}`);
       if (!res.ok) {
         setList(null);
         return;
@@ -76,7 +77,7 @@ export function GroceryListDetailPage() {
       prev ? { ...prev, items: prev.items.map((x) => (x.id === itemId ? { ...x, checked } : x)) } : prev
     );
 
-    const res = await fetch(`${API}/grocery-items/${itemId}`, {
+    const res = await fetch(`${API_BASE}/grocery-items/${itemId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ checked }),

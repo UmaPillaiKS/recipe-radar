@@ -7,6 +7,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
+import { API_BASE } from "../lib/api";
 
 type Recipe = { id: string; title: string };
 
@@ -39,13 +40,12 @@ export function GroceryPage() {
   const [pantryInput, setPantryInput] = useState("eggs, salt");
   const [listName, setListName] = useState("This week");
   const [preview, setPreview] = useState<Preview | null>(null);
-  const API = import.meta.env.VITE_API_URL;
 
   const nav = useNavigate();
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`${API}/recipes`);
+      const res = await fetch(`${API_BASE}/recipes`);
       const data = await res.json();
       setRecipes(data);
     })();
@@ -78,7 +78,7 @@ export function GroceryPage() {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      const res = await fetch(`${API}/grocery-lists/preview`, {
+      const res = await fetch(`${API_BASE}/grocery-lists/preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipeIds, pantryIngredients }),
@@ -114,7 +114,7 @@ export function GroceryPage() {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      const res = await fetch(`${API}/grocery-lists`, {
+      const res = await fetch(`${API_BASE}/grocery-lists`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, recipeIds, pantryIngredients }),

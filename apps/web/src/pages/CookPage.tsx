@@ -7,6 +7,7 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
+import { API_BASE } from "../lib/api";
 
 type MatchRecipe = {
   id: string;
@@ -36,13 +37,12 @@ export function CookPage() {
 
   const ingredients = useMemo(() => parseCommaList(input), [input]);
   const canSearch = ingredients.length > 0 && !loading;
-  const API = import.meta.env.VITE_API_URL;
 
   async function onMatch() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API}/match`, {
+      const res = await fetch(`${API_BASE}/match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ingredients }),

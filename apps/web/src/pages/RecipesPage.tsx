@@ -7,6 +7,7 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
+import { API_BASE } from "../lib/api";
 
 type Recipe = {
   id: string;
@@ -19,7 +20,6 @@ type Recipe = {
 function normalize(s: string) {
   return s.trim().toLowerCase();
 }
-const API = import.meta.env.VITE_API_URL;
 
 
 export function RecipesPage() {
@@ -31,7 +31,7 @@ export function RecipesPage() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`${API}/recipes`);
+        const res = await fetch(`${API_BASE}/recipes`);
         const data = await res.json();
         setRecipes(data);
       } finally {

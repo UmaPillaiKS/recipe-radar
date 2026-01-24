@@ -6,7 +6,8 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
-const API = import.meta.env.VITE_API_URL;
+import { API_BASE } from "../lib/api";
+
 type Recipe = {
   id: string;
   title: string;
@@ -38,7 +39,7 @@ export function RecipeDetailPage() {
       setLoading(true);
       setErr(null);
       try {
-        const res = await fetch(`${API}/recipes/${id}`);
+        const res = await fetch(`${API_BASE}/recipes/${id}`);
         if (!res.ok) throw new Error("Failed to load recipe");
         const data = await res.json();
         setRecipe(data);

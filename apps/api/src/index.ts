@@ -352,7 +352,7 @@ app.post("/grocery-lists/preview", async (req, reply) => {
       amount: g.amount,
       unit: g.unit,
     }))
-    .sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
+    .sort((a, b) => String(a.ingredientName).localeCompare(String(b.ingredientName)));
 
   return reply.send({
     recipes: recipes.map((r) => ({ id: r.id, title: r.title })),
