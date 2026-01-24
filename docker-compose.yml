@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: recipe_radar_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: recipe
+      POSTGRES_PASSWORD: recipe
+      POSTGRES_DB: recipe_radar
+    volumes:
+      - recipe_radar_pg:/var/lib/postgresql/data
+
+volumes:
+  recipe_radar_pg:

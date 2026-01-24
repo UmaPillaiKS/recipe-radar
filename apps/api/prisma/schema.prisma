@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Recipe {
+  id        String   @id @default(cuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ingredients RecipeIngredient[]
+  steps       RecipeStep[]
+
+  planItems PlanItem[]
+}
+
+model Ingredient {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  usedIn       RecipeIngredient[]
+  groceryItems GroceryItem[]
+}
+
+model RecipeIngredient {
+  id           String     @id @default(cuid())
+  recipeId     String
+  ingredientId String
+  planItems    PlanItem[]
+
+  amount   Float?
+  unit     String?
+  optional Boolean @default(false)
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@unique([recipeId, ingredientId])
+}
+
+model RecipeStep {
+  id       String @id @default(cuid())
+  recipeId String
+  order    Int
+  text     String
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, order])
+}
+
+model Plan {
+  id        String   @id @default("default")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items        PlanItem[]
+  groceryItems GroceryItem[]
+}
+
+model PlanItem {
+  id       String @id @default(cuid())
+  planId   String
+  recipeId String
+
+  plan               Plan              @relation(fields: [planId], references: [id], onDelete: Cascade)
+  recipe             Recipe            @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  recipeIngredient   RecipeIngredient? @relation(fields: [recipeIngredientId], references: [id])
+  recipeIngredientId String?
+
+  @@unique([planId, recipeId])
+}
+
+model GroceryItem {
+  id           String @id @default(cuid())
+  planId       String
+  ingredientId String
+
+  amount  Float?
+  unit    String?
+  checked Boolean @default(false)
+
+  plan       Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@index([planId])
+}
