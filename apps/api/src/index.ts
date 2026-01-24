@@ -3,11 +3,26 @@ import cors from "@fastify/cors";
 import { prisma } from "./prisma.js";
 
 const app = Fastify({ logger: true });
+function normalize(s: string) {
+  return s.trim().toLowerCase();
+}
 
 await app.register(cors, {
-  origin: ["http://localhost:5173"],
+  origin: (origin, cb) => {
+    const allowed = [
+      "http://localhost:5173",
+      process.env.WEB_ORIGIN, // e.g. https://recipe-radar.vercel.app
+    ].filter(Boolean);
+
+    // allow no-origin requests (curl, server-to-server)
+    if (!origin) return cb(null, true);
+
+    if (allowed.includes(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"), false);
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 });
+
 
 app.get("/health", async () => ({ ok: true }));
 
@@ -160,37 +175,141 @@ app.get("/plan", async () => {
     include: { items: { include: { recipe: true } } },
   });
 });
-app.post("/grocery/generate", async () => {
-  // make sure plan exists
-  const plan = await prisma.plan.upsert({
-    where: { id: "default" },
-    update: {},
-    create: { id: "default" },
+app.patch("/grocery-items/:id", async (req, reply) => {
+  const { id } = req.params as { id: string };
+  const body = req.body as { checked: boolean };
+
+  const updated = await prisma.groceryItem.update({
+    where: { id },
+    data: { checked: Boolean(body.checked) },
+    include: { ingredient: true },
   });
 
-  const planItems = await prisma.planItem.findMany({
-    where: { planId: plan.id },
-    include: {
-      recipe: {
-        include: {
-          ingredients: { include: { ingredient: true } },
-        },
+  return reply.send(updated);
+});
+
+app.post("/grocery-lists", async (req, reply) => {
+  const body = (req.body ?? {}) as {
+    name?: string;
+    recipeIds?: string[];
+    pantryIngredients?: string[];
+  };
+
+  const name = (body.name ?? "").trim();
+  if (!name) return reply.code(400).send({ error: "name is required" });
+
+  const recipeIds = (body.recipeIds ?? []).filter(Boolean);
+  if (recipeIds.length === 0) return reply.code(400).send({ error: "recipeIds required" });
+
+  // reuse preview computation by calling prisma directly again (simple & fine for now)
+  const previewRes = await app.inject({
+    method: "POST",
+    url: "/grocery-lists/preview",
+    payload: { recipeIds, pantryIngredients: body.pantryIngredients ?? [] },
+  });
+
+  if (previewRes.statusCode !== 200) {
+    return reply.code(previewRes.statusCode).send(previewRes.json());
+  }
+
+  const preview = previewRes.json() as {
+    recipes: Array<{ id: string; title: string }>;
+    items: Array<{ ingredientId: string; ingredientName: string; amount: number | null; unit: string | null }>;
+  };
+
+  const created = await prisma.groceryList.create({
+    data: {
+      name,
+      items: {
+        create: preview.items.map((it) => ({
+          ingredientId: it.ingredientId,
+          amount: it.amount,
+          unit: it.unit,
+          checked: false,
+        })),
       },
+      recipes: {
+        create: preview.recipes.map((r) => ({ recipeId: r.id })),
+      },
+    },
+    include: {
+      items: { include: { ingredient: true } },
+      recipes: { include: { recipe: true } },
     },
   });
 
-  // take only required ingredients (optional=false)
-  const all = planItems.flatMap((pi) =>
-    pi.recipe.ingredients
+  return reply.code(201).send(created);
+});
+
+app.get("/grocery-lists", async () => {
+  return prisma.groceryList.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      _count: { select: { items: true } },
+    },
+  });
+});
+app.get("/grocery-lists/:id", async (req, reply) => {
+  const { id } = req.params as { id: string };
+
+  const list = await prisma.groceryList.findUnique({
+    where: { id },
+    include: {
+      recipes: { include: { recipe: true } },
+      items: { include: { ingredient: true }, orderBy: [{ checked: "asc" }, { ingredient: { name: "asc" } }] },
+    },
+  });
+
+  if (!list) return reply.code(404).send({ error: "not found" });
+  return list;
+});
+
+app.delete("/grocery-lists/:id", async (req, reply) => {
+  const { id } = req.params as { id: string };
+  await prisma.groceryList.delete({ where: { id } });
+  return reply.code(204).send();
+});
+app.patch("/grocery-lists/:id", async (req, reply) => {
+  const { id } = req.params as { id: string };
+  const body = req.body as { name?: string };
+  const name = (body.name ?? "").trim();
+  if (!name) return reply.code(400).send({ error: "name is required" });
+
+  const updated = await prisma.groceryList.update({
+    where: { id },
+    data: { name },
+  });
+
+  return reply.send(updated);
+});
+
+app.post("/grocery-lists/preview", async (req, reply) => {
+  const body = (req.body ?? {}) as { recipeIds?: string[]; pantryIngredients?: string[] };
+
+  const recipeIds = (body.recipeIds ?? []).filter(Boolean);
+  if (recipeIds.length === 0) return reply.code(400).send({ error: "recipeIds required" });
+
+  const pantrySet = new Set((body.pantryIngredients ?? []).map(normalize).filter(Boolean));
+
+  const recipes = await prisma.recipe.findMany({
+    where: { id: { in: recipeIds } },
+    include: { ingredients: { include: { ingredient: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const all = recipes.flatMap((r) =>
+    r.ingredients
       .filter((ri) => !ri.optional)
       .map((ri) => ({
         ingredientId: ri.ingredientId,
+        ingredientName: ri.ingredient.name,
         amount: ri.amount,
         unit: ri.unit,
       }))
   );
 
-  // aggregate by (ingredientId + unit)
+  const needed = all.filter((x) => !pantrySet.has(normalize(x.ingredientName)));
+
   const key = (x: { ingredientId: string; unit: string | null }) =>
     `${x.ingredientId}__${x.unit ?? ""}`;
 
@@ -199,10 +318,9 @@ app.post("/grocery/generate", async () => {
     { ingredientId: string; unit: string | null; amount: number | null; anyNull: boolean }
   >();
 
-  for (const x of all) {
+  for (const x of needed) {
     const k = key({ ingredientId: x.ingredientId, unit: x.unit });
     const g = grouped.get(k);
-
     const amountNull = x.amount == null;
 
     if (!g) {
@@ -222,45 +340,24 @@ app.post("/grocery/generate", async () => {
     }
   }
 
-  // replace grocery items (keep it simple for MVP)
-  await prisma.groceryItem.deleteMany({ where: { planId: plan.id } });
+  // return items with ingredient names (for UI)
+  const ingredientIds = Array.from(grouped.values()).map((g) => g.ingredientId);
+  const ingredients = await prisma.ingredient.findMany({ where: { id: { in: ingredientIds } } });
+  const nameById = new Map(ingredients.map((i) => [i.id, i.name]));
 
-  const createData = Array.from(grouped.values()).map((g) => ({
-    planId: plan.id,
-    ingredientId: g.ingredientId,
-    amount: g.amount,
-    unit: g.unit,
-    checked: false,
-  }));
+  const items = Array.from(grouped.values())
+    .map((g) => ({
+      ingredientId: g.ingredientId,
+      ingredientName: nameById.get(g.ingredientId) ?? "unknown",
+      amount: g.amount,
+      unit: g.unit,
+    }))
+    .sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
 
-  if (createData.length > 0) {
-    await prisma.groceryItem.createMany({ data: createData });
-  }
-
-  return prisma.groceryItem.findMany({
-    where: { planId: plan.id },
-    include: { ingredient: true },
-    orderBy: { checked: "asc" },
+  return reply.send({
+    recipes: recipes.map((r) => ({ id: r.id, title: r.title })),
+    items,
   });
-});
-app.get("/grocery", async () => {
-  return prisma.groceryItem.findMany({
-    where: { planId: "default" },
-    include: { ingredient: true },
-    orderBy: [{ checked: "asc" }, { ingredient: { name: "asc" } }],
-  });
-});
-app.patch("/grocery/:id", async (req, reply) => {
-  const { id } = req.params as { id: string };
-  const body = req.body as { checked: boolean };
-
-  const updated = await prisma.groceryItem.update({
-    where: { id },
-    data: { checked: Boolean(body.checked) },
-    include: { ingredient: true },
-  });
-
-  return reply.send(updated);
 });
 
 

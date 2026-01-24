@@ -1,7 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Button } from "../components/ui/button";
+import { Card } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Checkbox } from "../components/ui/checkbox";
+import { Label } from "../components/ui/label";
+import { Separator } from "../components/ui/separator";
+import { PageHeader } from "../components/PageHeader";
 
 type IngredientRow = { name: string; amount: string; unit: string; optional: boolean };
+const API = import.meta.env.VITE_API_URL;
+
 
 export function NewRecipePage() {
   const nav = useNavigate();
@@ -14,8 +23,22 @@ export function NewRecipePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const canSave = useMemo(() => title.trim().length > 0, [title]);
+
   function updateIngredient(i: number, patch: Partial<IngredientRow>) {
     setIngredients((prev) => prev.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
+  }
+
+  function removeIngredient(i: number) {
+    setIngredients((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
+  }
+
+  function updateStep(i: number, value: string) {
+    setSteps((prev) => prev.map((x, idx) => (idx === i ? value : x)));
+  }
+
+  function removeStep(i: number) {
+    setSteps((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -42,7 +65,7 @@ export function NewRecipePage() {
 
     setSaving(true);
     try {
-      const res = await fetch("http://localhost:4000/recipes", {
+      const res = await fetch(`${API}/recipes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -63,81 +86,195 @@ export function NewRecipePage() {
   }
 
   return (
-    <div style={{ padding: 16, maxWidth: 700 }}>
-      <Link to="/recipes">← Back</Link>
-      <h1>Add recipe</h1>
+    <div className="space-y-6">
+      <PageHeader
+        title="Add recipe"
+        description="Create a recipe with ingredients and step-by-step instructions."
+        actions={
+          <Button asChild variant="secondary">
+            <Link to="/recipes">← Back</Link>
+          </Button>
+        }
+      />
 
-      {error && <div style={{ marginBottom: 12 }}>{error}</div>}
+      {error && (
+        <Card className="p-4 border-destructive/40">
+          <div className="text-sm text-destructive">{error}</div>
+        </Card>
+      )}
 
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label>
-            Title<br />
-            <input
+      <form onSubmit={onSubmit} className="space-y-6">
+        {/* Title */}
+        <Card className="p-6 space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
+              placeholder="e.g. Simple Omelette"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              style={{ width: "100%", padding: 8 }}
-            />
-          </label>
-        </div>
-
-        <h2>Ingredients</h2>
-        {ingredients.map((row, i) => (
-          <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input
-              placeholder="name (e.g. eggs)"
-              value={row.name}
-              onChange={(e) => updateIngredient(i, { name: e.target.value })}
-              style={{ flex: 2, padding: 8 }}
-            />
-            <input
-              placeholder="amount"
-              value={row.amount}
-              onChange={(e) => updateIngredient(i, { amount: e.target.value })}
-              style={{ flex: 1, padding: 8 }}
-            />
-            <input
-              placeholder="unit"
-              value={row.unit}
-              onChange={(e) => updateIngredient(i, { unit: e.target.value })}
-              style={{ flex: 1, padding: 8 }}
-            />
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={row.optional}
-                onChange={(e) => updateIngredient(i, { optional: e.target.checked })}
-              />
-              optional
-            </label>
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={() => setIngredients((prev) => [...prev, { name: "", amount: "", unit: "", optional: false }])}
-        >
-          + ingredient
-        </button>
-
-        <h2 style={{ marginTop: 16 }}>Steps</h2>
-        {steps.map((s, i) => (
-          <div key={i} style={{ marginBottom: 8 }}>
-            <input
-              placeholder={`Step ${i + 1}`}
-              value={s}
-              onChange={(e) => setSteps((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))}
-              style={{ width: "100%", padding: 8 }}
+              autoFocus
             />
           </div>
-        ))}
-        <button type="button" onClick={() => setSteps((prev) => [...prev, ""])}>
-          + step
-        </button>
+          <div className="text-sm text-muted-foreground">
+            Keep it short and recognizable.
+          </div>
+        </Card>
 
-        <div style={{ marginTop: 16 }}>
-          <button type="submit" disabled={saving}>
-            {saving ? "Saving…" : "Save"}
-          </button>
+        {/* Ingredients */}
+        <Card className="p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Ingredients</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Add amounts when possible. Mark optional items if they’re not required.
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() =>
+                setIngredients((prev) => [...prev, { name: "", amount: "", unit: "", optional: false }])
+              }
+            >
+              + Ingredient
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            {ingredients.map((row, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-1 gap-3 rounded-lg border p-4 sm:grid-cols-12 sm:items-center"
+              >
+                <div className="sm:col-span-5">
+                  <Label className="sr-only" htmlFor={`ing-name-${i}`}>
+                    Ingredient name
+                  </Label>
+                  <Input
+                    id={`ing-name-${i}`}
+                    placeholder="Name (e.g. eggs)"
+                    value={row.name}
+                    onChange={(e) => updateIngredient(i, { name: e.target.value })}
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <Label className="sr-only" htmlFor={`ing-amount-${i}`}>
+                    Amount
+                  </Label>
+                  <Input
+                    id={`ing-amount-${i}`}
+                    placeholder="Amount"
+                    inputMode="decimal"
+                    value={row.amount}
+                    onChange={(e) => updateIngredient(i, { amount: e.target.value })}
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <Label className="sr-only" htmlFor={`ing-unit-${i}`}>
+                    Unit
+                  </Label>
+                  <Input
+                    id={`ing-unit-${i}`}
+                    placeholder="Unit"
+                    value={row.unit}
+                    onChange={(e) => updateIngredient(i, { unit: e.target.value })}
+                  />
+                </div>
+
+                <div className="sm:col-span-2 flex items-center gap-2">
+                  <Checkbox
+                    id={`ing-opt-${i}`}
+                    checked={row.optional}
+                    onCheckedChange={(v) => updateIngredient(i, { optional: Boolean(v) })}
+                  />
+                  <Label htmlFor={`ing-opt-${i}`} className="text-sm text-muted-foreground">
+                    Optional
+                  </Label>
+                </div>
+
+                <div className="sm:col-span-1 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={() => removeIngredient(i)}
+                    disabled={ingredients.length === 1}
+                    title={ingredients.length === 1 ? "Keep at least one row" : "Remove"}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Steps */}
+        <Card className="p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Steps</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Short, clear instructions work best.
+              </p>
+            </div>
+
+            <Button type="button" variant="secondary" onClick={() => setSteps((prev) => [...prev, ""])}>
+              + Step
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            {steps.map((s, i) => (
+              <div key={i} className="flex gap-3">
+                <div className="mt-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium">
+                  {i + 1}
+                </div>
+
+                <div className="flex-1">
+                  <Label className="sr-only" htmlFor={`step-${i}`}>
+                    Step {i + 1}
+                  </Label>
+                  <Input
+                    id={`step-${i}`}
+                    placeholder={`Step ${i + 1} (e.g. Beat eggs with salt)`}
+                    value={s}
+                    onChange={(e) => updateStep(i, e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={() => removeStep(i)}
+                  disabled={steps.length === 1}
+                  title={steps.length === 1 ? "Keep at least one row" : "Remove"}
+                >
+                  ✕
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between gap-3">
+          <Button asChild variant="secondary">
+            <Link to="/recipes">Cancel</Link>
+          </Button>
+
+          <Button type="submit" disabled={saving || !canSave}>
+            {saving ? "Saving…" : "Save recipe"}
+          </Button>
         </div>
       </form>
     </div>

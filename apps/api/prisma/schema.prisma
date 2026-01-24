@@ -16,7 +16,9 @@ model Recipe {
   steps       RecipeStep[]
 
   planItems PlanItem[]
+  groceryLists GroceryListRecipe[]
 }
+
 
 model Ingredient {
   id        String   @id @default(cuid())
@@ -28,10 +30,9 @@ model Ingredient {
 }
 
 model RecipeIngredient {
-  id           String     @id @default(cuid())
+  id           String @id @default(cuid())
   recipeId     String
   ingredientId String
-  planItems    PlanItem[]
 
   amount   Float?
   unit     String?
@@ -59,8 +60,7 @@ model Plan {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items        PlanItem[]
-  groceryItems GroceryItem[]
+  items PlanItem[]
 }
 
 model PlanItem {
@@ -68,25 +68,46 @@ model PlanItem {
   planId   String
   recipeId String
 
-  plan               Plan              @relation(fields: [planId], references: [id], onDelete: Cascade)
-  recipe             Recipe            @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  recipeIngredient   RecipeIngredient? @relation(fields: [recipeIngredientId], references: [id])
-  recipeIngredientId String?
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@unique([planId, recipeId])
 }
 
 model GroceryItem {
-  id           String @id @default(cuid())
-  planId       String
-  ingredientId String
+  id            String @id @default(cuid())
+  groceryListId String
+  ingredientId  String
 
   amount  Float?
   unit    String?
   checked Boolean @default(false)
 
-  plan       Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
-  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  groceryList GroceryList @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+  ingredient  Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
 
-  @@index([planId])
+  @@index([groceryListId])
 }
+
+model GroceryList {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     GroceryItem[]
+  recipes   GroceryListRecipe[]   // <-- MUST be exactly this (name "recipes")
+}
+
+
+model GroceryListRecipe {
+  id            String     @id @default(cuid())
+  groceryListId String
+  recipeId      String
+
+  groceryList GroceryList @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+  recipe      Recipe      @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+
+  @@unique([groceryListId, recipeId])
+}
+
