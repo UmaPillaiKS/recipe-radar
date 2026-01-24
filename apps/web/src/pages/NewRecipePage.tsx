@@ -127,7 +127,7 @@ export function NewRecipePage() {
             <div>
               <h2 className="text-lg font-semibold tracking-tight">Ingredients</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Add amounts when possible. Mark optional items if they’re not required.
+                Add amounts when possible. Mark optional items if they are not required.
               </p>
             </div>
 
