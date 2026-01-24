@@ -9,19 +9,27 @@ function normalize(s: string) {
 
 await app.register(cors, {
   origin: (origin, cb) => {
-    const allowed = [
-      "http://localhost:5173",
-      process.env.WEB_ORIGIN, // e.g. https://recipe-radar.vercel.app
-    ].filter(Boolean);
+    const webOrigin = process.env.WEB_ORIGIN?.trim();
 
-    // allow no-origin requests (curl, server-to-server)
+    // allow no-origin requests (curl, server-to-server, Render internal checks)
     if (!origin) return cb(null, true);
 
-    if (allowed.includes(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"), false);
+    // allow local dev
+    if (origin === "http://localhost:5173") return cb(null, true);
+
+    // allow exact production frontend origin
+    if (webOrigin && origin === webOrigin) return cb(null, true);
+
+    // optional: allow ALL vercel preview deployments (handy while testing)
+    // comment this out if you want strict-only prod
+    if (origin.endsWith(".vercel.app")) return cb(null, true);
+
+    // IMPORTANT: don't throw (throwing causes 500)
+    return cb(null, false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 });
+
 
 
 app.get("/health", async () => ({ ok: true }));
