@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { prisma } from "./prisma.js";
+import { lookupMealById, searchMealsByName, getRandomMeal } from "./integrations/themealdb.js";
+
 
 const app = Fastify({ logger: true });
 function normalize(s: string) {
@@ -367,6 +369,93 @@ app.post("/grocery-lists/preview", async (req, reply) => {
     items,
   });
 });
+// --- TheMealDB integration ---
+
+app.get("/external/meals/search", async (req, reply) => {
+  const { q } = (req.query as { q?: string }) ?? {};
+  const query = (q ?? "").trim();
+  if (!query) return reply.code(400).send({ error: "q is required" });
+
+  const results = await searchMealsByName(query);
+  return { results };
+});
+
+app.post("/external/meals/import", async (req, reply) => {
+  const body = (req.body ?? {}) as { mealId?: string };
+
+  const mealId = String(body.mealId ?? "").trim();
+  if (!mealId) return reply.code(400).send({ error: "mealId is required" });
+
+  const meal = await lookupMealById(mealId);
+  if (!meal) return reply.code(404).send({ error: "meal not found" });
+
+  // Convert meal -> your schema
+  // - Ingredients: we import as Ingredient rows + RecipeIngredient rows
+  // - Steps: split instructions into simple lines
+  const normalized = (name: string) => name.trim().toLowerCase();
+
+  const steps = meal.instructions
+    .split(/\r?\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const created = await prisma.recipe.create({
+    data: {
+      title: meal.title.trim(),
+      ingredients: {
+        create: await Promise.all(
+          meal.ingredients.map(async (ing) => {
+            const name = normalized(ing.name);
+            const ingredient = await prisma.ingredient.upsert({
+              where: { name },
+              update: {},
+              create: { name },
+            });
+
+            // We store the "measure" as unit for now (MVP)
+            // amount stays null because TheMealDB measure is often "1 tsp", "a handful", etc.
+            return {
+              ingredientId: ingredient.id,
+              amount: null,
+              unit: ing.measure,
+              optional: false,
+            };
+          })
+        ),
+      },
+      steps: {
+        create: (steps.length ? steps : ["Follow TheMealDB instructions."]).map((text, idx) => ({
+          order: idx + 1,
+          text,
+        })),
+      },
+    },
+    include: {
+      ingredients: { include: { ingredient: true } },
+      steps: { orderBy: { order: "asc" } },
+    },
+  });
+
+  return reply.code(201).send(created);
+});
+app.get("/external/meals/suggestions", async (req) => {
+  const count = Math.min(Math.max(Number((req.query as any)?.count ?? 3), 1), 6);
+
+  const seen = new Set<string>();
+  const results: Array<{ id: string; title: string; thumb: string | null }> = [];
+
+  // Try a few extra times to avoid duplicates
+  for (let tries = 0; tries < count * 3 && results.length < count; tries++) {
+    const m = await getRandomMeal();
+    if (!m) continue;
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    results.push(m);
+  }
+
+  return { results };
+});
+
 
 
 const PORT = Number(process.env.PORT ?? 4000);
