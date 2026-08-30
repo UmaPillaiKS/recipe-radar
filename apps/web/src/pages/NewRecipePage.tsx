@@ -8,6 +8,7 @@ import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
 import { API_BASE } from "../lib/api";
+import { getErrorMessage } from "../lib/errors";
 
 type IngredientRow = { name: string; amount: string; unit: string; optional: boolean };
 
@@ -78,8 +79,8 @@ export function NewRecipePage() {
 
       const created = await res.json();
       nav(`/recipes/${created.id}`);
-    } catch (err: any) {
-      setError(err.message ?? "Something went wrong");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Something went wrong"));
     } finally {
       setSaving(false);
     }
@@ -104,7 +105,6 @@ export function NewRecipePage() {
       )}
 
       <form onSubmit={onSubmit} className="space-y-6">
-        {/* Title */}
         <Card className="p-6 space-y-3">
           <div className="space-y-1">
             <Label htmlFor="title">Title</Label>
@@ -120,8 +120,6 @@ export function NewRecipePage() {
             Keep it short and recognizable.
           </div>
         </Card>
-
-        {/* Ingredients */}
         <Card className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -214,8 +212,6 @@ export function NewRecipePage() {
             ))}
           </div>
         </Card>
-
-        {/* Steps */}
         <Card className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -265,8 +261,6 @@ export function NewRecipePage() {
             ))}
           </div>
         </Card>
-
-        {/* Actions */}
         <div className="flex items-center justify-between gap-3">
           <Button asChild variant="secondary">
             <Link to="/recipes">Cancel</Link>

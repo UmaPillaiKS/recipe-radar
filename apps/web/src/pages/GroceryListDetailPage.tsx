@@ -8,6 +8,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
 import { API_BASE } from "../lib/api";
+import { getErrorMessage } from "../lib/errors";
 
 type Item = {
   id: string;
@@ -50,8 +51,8 @@ export function GroceryListDetailPage() {
         return;
       }
       setList(await res.json());
-    } catch (e: any) {
-      setErr(e.message ?? "Failed to load");
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e, "Failed to load"));
       setList(null);
     } finally {
       setLoading(false);
@@ -141,7 +142,6 @@ export function GroceryListDetailPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: meta */}
         <Card className="p-6 space-y-4 lg:col-span-1">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -184,8 +184,6 @@ export function GroceryListDetailPage() {
             <Link to="/grocery">Generate another list</Link>
           </Button>
         </Card>
-
-        {/* Right: items */}
         <Card className="p-6 space-y-4 lg:col-span-2">
           <div className="flex items-start justify-between gap-3">
             <div>
