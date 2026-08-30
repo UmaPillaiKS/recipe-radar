@@ -15,7 +15,6 @@ test("MealDB search proxy works (if enabled)", async () => {
   const api = await request.newContext({ baseURL: API_URL });
 
   const res = await api.get("/external/meals/search?q=chicken");
-  // If you haven’t added this yet, remove this test for now.
   expect(res.ok()).toBeTruthy();
   const json = await res.json();
   expect(Array.isArray(json.results)).toBe(true);

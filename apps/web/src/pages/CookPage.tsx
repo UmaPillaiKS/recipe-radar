@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRight,CircleCheck, PackageSearch, Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -8,6 +9,7 @@ import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
 import { API_BASE } from "../lib/api";
+import { getErrorMessage } from "../lib/errors";
 
 type MatchRecipe = {
   id: string;
@@ -30,7 +32,7 @@ function parseCommaList(input: string) {
 }
 
 export function CookPage() {
-  const [input, setInput] = useState("eggs, salt");
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<MatchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +41,8 @@ export function CookPage() {
   const canSearch = ingredients.length > 0 && !loading;
 
   async function onMatch() {
+    if (!canSearch) return;
+
     setError(null);
     setLoading(true);
     try {
@@ -48,11 +52,11 @@ export function CookPage() {
         body: JSON.stringify({ ingredients }),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error("We couldn't match your pantry right now. Please try again.");
       const json = (await res.json()) as MatchResponse;
       setData(json);
-    } catch (e: any) {
-      setError(e.message ?? "Failed to match");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "We couldn't match your pantry right now. Please try again."));
       setData(null);
     } finally {
       setLoading(false);
@@ -60,165 +64,152 @@ export function CookPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        title="Cook from pantry"
-        description="Enter what you already have. We’ll show what you can cook now — and what you’re close to making."
+        title="Cook from your pantry"
+        description="Tell Recipe Radar what is already in your kitchen. We’ll find dishes you can make now and the closest matches for everything else."
         actions={
-          <Button asChild variant="secondary">
-            <Link to="/recipes">Browse recipes</Link>
+          <Button asChild variant="outline">
+            <Link to="/recipes">Browse all recipes</Link>
           </Button>
         }
       />
 
+      <Card className="overflow-hidden border-primary/10 shadow-sm">
+        <div className="bg-gradient-to-r from-secondary/70 to-card p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-xl">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <PackageSearch className="h-4 w-4" /> Your pantry
+              </div>
+              <h2 className="mt-2 text-xl font-bold tracking-tight">What ingredients do you have?</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Separate ingredients with commas. You can keep it simple — for example: eggs, tomatoes, rice, garlic.
+              </p>
+            </div>
+            <Badge variant="secondary" className="w-fit">{ingredients.length} {ingredients.length === 1 ? "ingredient" : "ingredients"}</Badge>
+          </div>
+
+          <form
+            className="mt-5 flex flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onMatch();
+            }}
+          >
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="eggs, tomatoes, rice, garlic"
+              aria-label="Pantry ingredients"
+            />
+            <Button type="submit" disabled={!canSearch} className="sm:min-w-36">
+              {loading ? "Matching…" : "Find recipes"}
+              {!loading && <ArrowRight />}
+            </Button>
+          </form>
+
+          {ingredients.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {ingredients.map((ingredient, idx) => (
+                <Badge key={`${ingredient}-${idx}`} variant="outline" className="bg-background/70">
+                  {ingredient}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
       {error && (
-        <Card className="p-4 border-destructive/40">
-          <div className="text-sm text-destructive whitespace-pre-wrap">{error}</div>
+        <Card className="border-destructive/30 bg-destructive/5 p-4 shadow-none">
+          <div className="text-sm text-destructive">{error}</div>
         </Card>
       )}
 
-      {/* Input */}
-      <Card className="p-6 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Your pantry</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Comma-separated, e.g. <span className="font-mono">eggs, tomato, salt</span>
-            </p>
-          </div>
-          <Badge variant="secondary">{ingredients.length} items</Badge>
-        </div>
-
-        <Separator />
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="eggs, tomato, salt"
-          />
-          <Button onClick={onMatch} disabled={!canSearch} className="sm:w-40">
-            {loading ? "Matching…" : "Find recipes"}
-          </Button>
-        </div>
-
-        {ingredients.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {ingredients.map((x, idx) => (
-              <Badge key={`${x}-${idx}`} variant="outline">
-                {x}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        {!canSearch && (
-          <div className="text-xs text-muted-foreground">
-            Add at least one ingredient to search.
-          </div>
-        )}
-      </Card>
-
-      {/* Results */}
       {!data ? (
         <EmptyState
-          title="No results yet"
-          description="Enter your pantry items and click “Find recipes”."
-          action={
-            <Button onClick={onMatch} disabled={!canSearch}>
-              {loading ? "Matching…" : "Find recipes"}
-            </Button>
-          }
+          title="Ready when your pantry is"
+          description="Add at least one ingredient above to see what you can make."
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Cookable */}
-          <Card className="p-6 space-y-4">
+          <Card className="p-5 shadow-sm sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight">Can cook now</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recipes where you have all required ingredients.
-                </p>
+                <div className="flex items-center gap-2">
+                  <CircleCheck className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-bold tracking-tight">Ready to cook</h2>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">You already have every required ingredient.</p>
               </div>
               <Badge variant="secondary">{data.cookable.length}</Badge>
             </div>
 
-            <Separator />
+            <Separator className="my-5" />
 
             {data.cookable.length === 0 ? (
-              <EmptyState
-                title="No exact matches"
-                description="Try adding more pantry items, or check the “Almost” section."
-              />
+              <div className="rounded-xl border border-dashed bg-muted/20 p-5 text-sm text-muted-foreground">
+                No exact matches yet. Add a few more pantry items or check the close matches.
+              </div>
             ) : (
               <div className="space-y-2">
-                {data.cookable.map((r) => (
-                  <Link key={r.id} to={`/recipes/${r.id}`} className="group">
-                    <Card className="p-4 transition hover:bg-accent/20">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{r.title}</div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {r.matchedCount}/{r.requiredCount} matched
-                          </div>
-                        </div>
-                        <Badge variant="outline">Cook</Badge>
-                      </div>
-                    </Card>
+                {data.cookable.map((recipe) => (
+                  <Link
+                    key={recipe.id}
+                    to={`/recipes/${recipe.id}`}
+                    className="group flex items-center justify-between gap-3 rounded-xl border p-4 transition hover:border-primary/25 hover:bg-accent/30"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{recipe.title}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{recipe.matchedCount}/{recipe.requiredCount} ingredients matched</div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
                   </Link>
                 ))}
               </div>
             )}
           </Card>
 
-          {/* Almost */}
-          <Card className="p-6 space-y-4">
+          <Card className="p-5 shadow-sm sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight">Almost</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recipes you can make with a few missing items.
-                </p>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-bold tracking-tight">Close matches</h2>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">Recipes that only need a few more ingredients.</p>
               </div>
               <Badge variant="secondary">{data.almost.length}</Badge>
             </div>
 
-            <Separator />
+            <Separator className="my-5" />
 
             {data.almost.length === 0 ? (
-              <EmptyState
-                title="Nothing here"
-                description="Nice! Either you can cook everything, or you need more pantry items to match."
-              />
+              <div className="rounded-xl border border-dashed bg-muted/20 p-5 text-sm text-muted-foreground">
+                No close matches found for this pantry combination.
+              </div>
             ) : (
               <div className="space-y-2">
-                {data.almost.map((r) => (
-                  <Link key={r.id} to={`/recipes/${r.id}`} className="group">
-                    <Card className="p-4 transition hover:bg-accent/20">
-                      <div className="space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{r.title}</div>
-                            <div className="text-sm text-muted-foreground mt-1">
-                              Missing {r.missing.length} item{r.missing.length === 1 ? "" : "s"}
-                            </div>
-                          </div>
-                          <Badge variant="outline">Almost</Badge>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {r.missing.slice(0, 8).map((m, idx) => (
-                            <Badge key={`${m}-${idx}`} variant="secondary">
-                              {m}
-                            </Badge>
-                          ))}
-                          {r.missing.length > 8 && (
-                            <Badge variant="outline">+{r.missing.length - 8} more</Badge>
-                          )}
-                        </div>
+                {data.almost.map((recipe) => (
+                  <Link
+                    key={recipe.id}
+                    to={`/recipes/${recipe.id}`}
+                    className="group block rounded-xl border p-4 transition hover:border-primary/25 hover:bg-accent/30"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{recipe.title}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Missing {recipe.missing.length} {recipe.missing.length === 1 ? "ingredient" : "ingredients"}</div>
                       </div>
-                    </Card>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {recipe.missing.slice(0, 6).map((ingredient, idx) => (
+                        <Badge key={`${ingredient}-${idx}`} variant="secondary">{ingredient}</Badge>
+                      ))}
+                      {recipe.missing.length > 6 && <Badge variant="outline">+{recipe.missing.length - 6} more</Badge>}
+                    </div>
                   </Link>
                 ))}
               </div>

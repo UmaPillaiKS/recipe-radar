@@ -19,14 +19,14 @@ test("Add recipe via API, shows in UI list, opens detail", async ({ page }) => {
 
   // 2) UI: open recipes page and find it
   await page.goto("/recipes");
-  await expect(page.getByRole("heading", { name: "Recipes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your recipes" })).toBeVisible();
 
-  // if your list is simple Links, this works well:
   await expect(page.getByRole("link", { name: unique })).toBeVisible();
 
   // 3) UI: open detail and verify ingredient + step
   await page.getByRole("link", { name: unique }).click();
+
   await expect(page.getByRole("heading", { name: unique })).toBeVisible();
-  await expect(page.getByText("eggs")).toBeVisible();
-  await expect(page.getByText("Crack eggs")).toBeVisible();
+  await expect(page.getByText("eggs", { exact: true })).toBeVisible();
+  await expect(page.getByText("Crack eggs", { exact: true })).toBeVisible();
 });

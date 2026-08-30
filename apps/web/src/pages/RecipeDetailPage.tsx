@@ -7,6 +7,7 @@ import { Separator } from "../components/ui/separator";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
 import { API_BASE } from "../lib/api";
+import { getErrorMessage } from "../lib/errors";
 
 type Recipe = {
   id: string;
@@ -43,9 +44,9 @@ export function RecipeDetailPage() {
         if (!res.ok) throw new Error("Failed to load recipe");
         const data = await res.json();
         setRecipe(data);
-      } catch (e: any) {
+      } catch (e: unknown) {
         setRecipe(null);
-        setErr(e.message ?? "Failed to load recipe");
+        setErr(getErrorMessage(e, "Failed to load recipe"));
       } finally {
         setLoading(false);
       }
@@ -110,7 +111,6 @@ export function RecipeDetailPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Ingredients */}
         <Card className="p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -151,8 +151,6 @@ export function RecipeDetailPage() {
             ))}
           </div>
         </Card>
-
-        {/* Steps */}
         <Card className="p-6">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Steps</h2>
